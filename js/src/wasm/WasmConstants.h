@@ -225,12 +225,20 @@ enum class LimitsFlags {
   HasMaximum = 0x1,
   IsShared = 0x2,
   IsI64 = 0x4,
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  HasCustomPageSize = 0x8,
+#endif
 };
 
 enum class LimitsMask {
   Table = uint8_t(LimitsFlags::HasMaximum) | uint8_t(LimitsFlags::IsI64),
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  Memory = uint8_t(LimitsFlags::HasMaximum) | uint8_t(LimitsFlags::IsShared) |
+           uint8_t(LimitsFlags::IsI64) | uint8_t(LimitsFlags::HasCustomPageSize),
+#else
   Memory = uint8_t(LimitsFlags::HasMaximum) | uint8_t(LimitsFlags::IsShared) |
            uint8_t(LimitsFlags::IsI64),
+#endif
 };
 
 enum class DataSegmentKind {

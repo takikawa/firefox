@@ -792,6 +792,9 @@ struct Limits {
   uint64_t initial;
   mozilla::Maybe<uint64_t> maximum;
 
+  // Defaults to PageSize and only modified if custom page sizes is enabled.
+  uint32_t pageSize;
+
   // `shared` is Shareable::False for tables but may be Shareable::True for
   // memories.
   Shareable shared;
@@ -805,6 +808,7 @@ struct Limits {
       : addressType(AddressType::I32),
         initial(initial),
         maximum(maximum),
+        pageSize(wasm::PageSize),
         shared(shared) {}
 };
 

@@ -2859,6 +2859,18 @@ static bool DecodeLimits(Decoder& d, LimitsKind kind, Limits* limits) {
     limits->maximum.emplace(maximum);
   }
 
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  if (flags & uint8_t(LimitsFlags::HasCustomPageSize)) {
+    uint32_t customPageSize;
+    // FIXME: use some constants here?
+    if (!d.readVarU32(&customPageSize) ||
+          (customPageSize != 0 && customPageSize != 16)) {
+      return d.fail("bad custom page size");
+    }
+    limits->pageSize = customPageSize;
+  }
+#endif
+
   return true;
 }
 
