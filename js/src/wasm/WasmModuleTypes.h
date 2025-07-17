@@ -847,7 +847,7 @@ struct MemoryDesc {
   uint64_t initialLength() const {
     // See static_assert after MemoryDesc for why this is safe for memory32.
     MOZ_ASSERT_IF(addressType() == AddressType::I64,
-                  limits.initial <= UINT64_MAX / PageSize);
+                  limits.initial <= UINT64_MAX / StandardPageSize);
     return limits.initial * StandardPageSize;
   }
 

@@ -52,6 +52,18 @@ extern bool ToAddressType(JSContext* cx, HandleValue value,
 
 extern const char* ToString(AddressType addressType);
 
+static constexpr unsigned PageSizeInBytes(PageSize sz) {
+  return 1U << static_cast<uint8_t>(sz);
+}
+
+static constexpr unsigned StandardPageSize = PageSizeInBytes(PageSize::Standard);
+static_assert(StandardPageSize == 64 * 1024);
+
+// By spec, see
+// https://github.com/WebAssembly/spec/issues/1895#issuecomment-2895078022
+static_assert((StandardPageSize * MaxMemory64StandardPagesValidation) <=
+              (uint64_t(1) << 53) - 1);
+
 // Pages is a typed unit representing a multiple of wasm::StandardPageSize. We
 // generally use pages as the unit of length when representing linear memory
 // lengths so as to avoid overflow when the specified initial or maximum pages
