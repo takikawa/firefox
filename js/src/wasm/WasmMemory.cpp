@@ -395,7 +395,7 @@ Pages wasm::ClampedMaxPages(AddressType t, Pages initialPages,
     // "a lot of memory". Maintain the invariant that initialPages <=
     // clampedMaxPages.
     static const uint64_t OneGib = 1 << 30;
-    static const Pages OneGibPages = Pages(OneGib >> wasm::PageBits);
+    static const Pages OneGibPages = Pages(OneGib / wasm::PageSize);
     static_assert(HighestValidARMImmediate > OneGib,
                   "computing mapped size on ARM requires clamped max size");
 
