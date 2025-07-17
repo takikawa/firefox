@@ -830,7 +830,7 @@ struct MemoryDesc {
   // larger than 32-bits.
   bool boundsCheckLimitIs32Bits() const {
     return limits.maximum.isSome() &&
-           limits.maximum.value() < (0x100000000 / PageSize);
+           limits.maximum.value() < (0x100000000 / StandardPageSize);
   }
 
   AddressType addressType() const { return limits.addressType; }
@@ -848,7 +848,7 @@ struct MemoryDesc {
     // See static_assert after MemoryDesc for why this is safe for memory32.
     MOZ_ASSERT_IF(addressType() == AddressType::I64,
                   limits.initial <= UINT64_MAX / PageSize);
-    return limits.initial * PageSize;
+    return limits.initial * StandardPageSize;
   }
 
   MemoryDesc() = default;
@@ -862,7 +862,7 @@ using MemoryDescVector = Vector<MemoryDesc, 1, SystemAllocPolicy>;
 
 // We never need to worry about overflow with a Memory32 field when
 // using a uint64_t.
-static_assert(MaxMemory32PagesValidation <= UINT64_MAX / PageSize);
+static_assert(MaxMemory32PagesValidation <= UINT64_MAX / StandardPageSize);
 
 struct TableDesc {
   Limits limits;

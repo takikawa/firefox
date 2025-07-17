@@ -1133,7 +1133,7 @@ enum class FieldWideningOp { None, Signed, Unsigned };
 // The WebAssembly spec hard-codes the virtual page size to be 64KiB and
 // requires the size of linear memory to always be a multiple of 64KiB.
 
-static const unsigned PageSize = 64 * 1024;
+static const unsigned StandardPageSize = 64 * 1024;
 
 // These limits are agreed upon with other engines for consistency.
 

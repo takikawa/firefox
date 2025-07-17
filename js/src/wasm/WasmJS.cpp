@@ -2304,7 +2304,8 @@ bool WasmMemoryObject::discardImpl(JSContext* cx, const CallArgs& args) {
     return false;
   }
 
-  if (byteOffset % wasm::PageSize != 0 || byteLen % wasm::PageSize != 0) {
+  if (byteOffset % wasm::StandardPageSize != 0 ||
+      byteLen % wasm::StandardPageSize != 0) {
     JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
                              JSMSG_WASM_UNALIGNED_ACCESS);
     return false;
@@ -2565,7 +2566,7 @@ size_t WasmMemoryObject::boundsCheckLimit() const {
   // max field.
   MOZ_ASSERT(mappedSize < UINT32_MAX);
 #endif
-  MOZ_ASSERT(mappedSize % wasm::PageSize == 0);
+  MOZ_ASSERT(mappedSize % wasm::StandardPageSize == 0);
   MOZ_ASSERT(mappedSize >= wasm::GuardSize);
   MOZ_ASSERT(wasm::IsValidBoundsCheckImmediate(mappedSize - wasm::GuardSize));
   size_t limit = mappedSize - wasm::GuardSize;

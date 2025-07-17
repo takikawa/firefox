@@ -52,7 +52,7 @@ extern bool ToAddressType(JSContext* cx, HandleValue value,
 
 extern const char* ToString(AddressType addressType);
 
-// Pages is a typed unit representing a multiple of wasm::PageSize. We
+// Pages is a typed unit representing a multiple of wasm::StandardPageSize. We
 // generally use pages as the unit of length when representing linear memory
 // lengths so as to avoid overflow when the specified initial or maximum pages
 // would overflow the native word size.
@@ -82,15 +82,15 @@ struct Pages {
   // Converts from a byte length to pages, assuming that the length is an
   // exact multiple of the page size.
   static Pages fromByteLengthExact(size_t byteLength) {
-    MOZ_ASSERT(byteLength % PageSize == 0);
-    return Pages(byteLength / PageSize);
+    MOZ_ASSERT(byteLength % StandardPageSize == 0);
+    return Pages(byteLength / StandardPageSize);
   }
 
   // Return whether the page length may overflow when converted to a byte
   // length in the native word size.
   bool hasByteLength() const {
     mozilla::CheckedInt<size_t> length(value_);
-    length *= PageSize;
+    length *= StandardPageSize;
     return length.isValid();
   }
 
@@ -98,7 +98,7 @@ struct Pages {
   // check for overflow, or be assured else-how that overflow cannot happen.
   size_t byteLength() const {
     mozilla::CheckedInt<size_t> length(value_);
-    length *= PageSize;
+    length *= StandardPageSize;
     return length.value();
   }
 
@@ -192,7 +192,7 @@ static const uint64_t HugeIndexRange = uint64_t(UINT32_MAX) + 1;
 // modules.
 static const uint64_t HugeOffsetGuardLimit = 1 << 25;
 // Reserve a wasm page (64KiB) to support slop on unaligned accesses.
-static const uint64_t HugeUnalignedGuardPage = PageSize;
+static const uint64_t HugeUnalignedGuardPage = StandardPageSize;
 
 // Compute the total memory reservation.
 static const uint64_t HugeMappedSize =
@@ -200,12 +200,12 @@ static const uint64_t HugeMappedSize =
 
 // Try to keep the memory reservation aligned to the wasm page size. This
 // ensures that it's aligned to the system page size.
-static_assert(HugeMappedSize % PageSize == 0);
+static_assert(HugeMappedSize % StandardPageSize == 0);
 
 #endif
 
 // The size of the guard page for non huge-memories.
-static const size_t GuardSize = PageSize;
+static const size_t GuardSize = StandardPageSize;
 
 // The size of the guard page that included NULL pointer. Reserve a smallest
 // range for typical hardware, to catch near NULL pointer accesses, e.g.

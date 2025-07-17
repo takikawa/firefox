@@ -147,7 +147,7 @@ RegI32 BaseCompiler::popConstMemoryAccess<RegI32>(MemoryAccessDesc* access,
   // Validation ensures that the offset is in 32-bit range, and the calculation
   // of the limit cannot overflow due to our choice of HugeOffsetGuardLimit.
 #ifdef WASM_SUPPORTS_HUGE_MEMORY
-  static_assert(MaxMemory32PagesValidation * PageSize <=
+  static_assert(MaxMemory32PagesValidation * StandardPageSize <=
                 UINT64_MAX - HugeOffsetGuardLimit);
 #endif
   uint64_t ea = uint64_t(addr) + uint64_t(access->offset32());
@@ -420,11 +420,11 @@ void BaseCompiler::prepareMemoryAccess(MemoryAccessDesc* access,
 #ifdef JS_64BIT
     // The checking depends on how many bits are in the pointer and how many
     // bits are in the bound.
-    static_assert(0x100000000 % PageSize == 0);
+    static_assert(0x100000000 % StandardPageSize == 0);
     if (!codeMeta_.memories[access->memoryIndex()].boundsCheckLimitIs32Bits() &&
         MaxMemoryPages(
             codeMeta_.memories[access->memoryIndex()].addressType()) >=
-            Pages(0x100000000 / PageSize)) {
+            Pages(0x100000000 / StandardPageSize)) {
       boundsCheck4GBOrLargerAccess(access->memoryIndex(), instance, ptr, &ok);
     } else {
       boundsCheckBelow4GBAccess(access->memoryIndex(), instance, ptr, &ok);

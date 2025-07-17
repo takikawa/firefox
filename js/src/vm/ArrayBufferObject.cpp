@@ -791,7 +791,7 @@ bool ArrayBufferObject::resizeImpl(JSContext* cx, const CallArgs& args) {
 
   if (obj->isWasm()) {
     // Special case for resizing of Wasm buffers.
-    if (newByteLength % wasm::PageSize != 0) {
+    if (newByteLength % wasm::StandardPageSize != 0) {
       JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                                 JSMSG_WASM_ARRAYBUFFER_PAGE_MULTIPLE);
       return false;
@@ -1526,7 +1526,7 @@ void ResizableArrayBufferObject::resize(size_t newByteLength) {
   MOZ_ASSERT(newSize <= mappedSize());
 
   size_t delta = newSize - oldSize;
-  MOZ_ASSERT(delta % wasm::PageSize == 0);
+  MOZ_ASSERT(delta % wasm::StandardPageSize == 0);
 
   uint8_t* dataEnd = dataPointer() + oldSize;
   MOZ_ASSERT(uintptr_t(dataEnd) % gc::SystemPageSize() == 0);
@@ -1545,8 +1545,8 @@ void WasmArrayRawBuffer::discard(size_t byteOffset, size_t byteLen) {
 
   // The caller is responsible for ensuring these conditions are met; see this
   // function's comment in ArrayBufferObject.h.
-  MOZ_ASSERT(byteOffset % wasm::PageSize == 0);
-  MOZ_ASSERT(byteLen % wasm::PageSize == 0);
+  MOZ_ASSERT(byteOffset % wasm::StandardPageSize == 0);
+  MOZ_ASSERT(byteLen % wasm::StandardPageSize == 0);
   MOZ_ASSERT(wasm::MemoryBoundsCheck(uint64_t(byteOffset), uint64_t(byteLen),
                                      byteLength()));
 
@@ -1773,7 +1773,7 @@ ArrayBufferObjectMaybeShared* js::CreateWasmBuffer(
 }
 
 bool ArrayBufferObject::prepareForAsmJS() {
-  MOZ_ASSERT(byteLength() % wasm::PageSize == 0,
+  MOZ_ASSERT(byteLength() % wasm::StandardPageSize == 0,
              "prior size checking should have guaranteed page-size multiple");
   MOZ_ASSERT(byteLength() > 0,
              "prior size checking should have excluded empty buffers");
@@ -1793,7 +1793,7 @@ bool ArrayBufferObject::prepareForAsmJS() {
 
     case INLINE_DATA:
       static_assert(
-          wasm::PageSize > FixedLengthArrayBufferObject::MaxInlineBytes,
+          wasm::StandardPageSize > FixedLengthArrayBufferObject::MaxInlineBytes,
           "inline data must be too small to be a page size multiple");
       MOZ_ASSERT_UNREACHABLE(
           "inline-data buffers should be implicitly excluded by size checks");

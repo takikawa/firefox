@@ -291,7 +291,7 @@ static_assert(HugeOffsetGuardLimit < UINT32_MAX,
 //    where `offset < OffsetGuardLimit` as well as the overflow from unaligned
 //    accesses, as described above for MaxMemoryAccessSize.
 
-static const size_t OffsetGuardLimit = PageSize - MaxMemoryAccessSize;
+static const size_t OffsetGuardLimit = StandardPageSize - MaxMemoryAccessSize;
 
 static_assert(MaxMemoryAccessSize < GuardSize,
               "Guard page handles partial out-of-bounds");
@@ -316,7 +316,8 @@ static_assert(MaxInlineMemoryFillLength < MinOffsetGuardLimit, "precondition");
 wasm::Pages wasm::MaxMemoryPages(AddressType t) {
   MOZ_ASSERT_IF(t == AddressType::I64, !IsHugeMemoryEnabled(t));
   size_t desired = MaxMemoryPagesValidation(t);
-  constexpr size_t actual = ArrayBufferObject::ByteLengthLimit / PageSize;
+  constexpr size_t actual =
+      ArrayBufferObject::ByteLengthLimit / StandardPageSize;
   return wasm::Pages(std::min(desired, actual));
 }
 
@@ -329,8 +330,9 @@ size_t wasm::MaxMemoryBoundsCheckLimit(AddressType t) {
 // range of an int32_t, which means the maximum heap size as observed by wasm
 // code is one wasm page less than 2GB.
 wasm::Pages wasm::MaxMemoryPages(AddressType t) {
-  static_assert(ArrayBufferObject::ByteLengthLimit >= INT32_MAX / PageSize);
-  return wasm::Pages(INT32_MAX / PageSize);
+  static_assert(
+      ArrayBufferObject::ByteLengthLimit >= INT32_MAX / StandardPageSize);
+  return wasm::Pages(INT32_MAX / StandardPageSize);
 }
 
 // The max bounds check limit can be larger than the MaxMemoryPages because it
@@ -356,7 +358,7 @@ static const uint64_t HighestValidARMImmediate = 0xff000000;
 bool wasm::IsValidARMImmediate(uint32_t i) {
   bool valid = (IsPowerOfTwo(i) || (i & 0x00ffffff) == 0);
 
-  MOZ_ASSERT_IF(valid, i % PageSize == 0);
+  MOZ_ASSERT_IF(valid, i % StandardPageSize == 0);
 
   return valid;
 }
@@ -395,7 +397,7 @@ Pages wasm::ClampedMaxPages(AddressType t, Pages initialPages,
     // "a lot of memory". Maintain the invariant that initialPages <=
     // clampedMaxPages.
     static const uint64_t OneGib = 1 << 30;
-    static const Pages OneGibPages = Pages(OneGib / wasm::PageSize);
+    static const Pages OneGibPages = Pages(OneGib / wasm::StandardPageSize);
     static_assert(HighestValidARMImmediate > OneGib,
                   "computing mapped size on ARM requires clamped max size");
 
