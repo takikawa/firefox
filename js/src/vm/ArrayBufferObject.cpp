@@ -2006,6 +2006,12 @@ AddressType js::WasmArrayBufferAddressType(
   }
   return buf->as<SharedArrayBufferObject>().wasmAddressType();
 }
+wasm::PageSize js::WasmArrayBufferPageSize(const ArrayBufferObjectMaybeShared* buf) {
+  if (buf->is<ArrayBufferObject>()) {
+    return buf->as<ArrayBufferObject>().wasmPageSize();
+  }
+  return buf->as<SharedArrayBufferObject>().wasmPageSize();
+}
 Pages js::WasmArrayBufferPages(const ArrayBufferObjectMaybeShared* buf) {
   if (buf->is<ArrayBufferObject>()) {
     return buf->as<ArrayBufferObject>().wasmPages();
