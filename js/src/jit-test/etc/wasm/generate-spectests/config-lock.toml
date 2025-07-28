@@ -5,3 +5,7 @@ commit = 'c022fb15'
 [[repos]]
 name = 'threads'
 commit = '3635ca51'
+
+[[repos]]
+name = 'custom-page-sizes'
+commit = 'f40a0609'
