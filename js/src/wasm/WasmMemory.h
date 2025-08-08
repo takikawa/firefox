@@ -233,6 +233,10 @@ extern bool IsValidARMImmediate(uint32_t i);
 // platform.
 extern uint64_t RoundUpToNextValidBoundsCheckImmediate(uint64_t i);
 
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+extern uint64_t RoundUpToNextSystemPageMultiple(uint64_t i);
+#endif
+
 // Return the next higher valid immediate for arm.
 extern uint64_t RoundUpToNextValidARMImmediate(uint64_t i);
 

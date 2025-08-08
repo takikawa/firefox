@@ -171,10 +171,11 @@ uint64_t js::WasmReservedBytes() { return wasmReservedBytes; }
   return true;
 }
 
-void* js::MapBufferMemory(wasm::AddressType t, size_t mappedSize,
-                          size_t initialCommittedSize) {
+void* js::MapBufferMemory(wasm::AddressType t, wasm::PageSize pageSize,
+                          size_t mappedSize, size_t initialCommittedSize) {
   MOZ_ASSERT(mappedSize % gc::SystemPageSize() == 0);
-  MOZ_ASSERT(initialCommittedSize % gc::SystemPageSize() == 0);
+  MOZ_ASSERT_IF(pageSize == wasm::PageSize::Standard,
+                initialCommittedSize % gc::SystemPageSize() == 0);
   MOZ_ASSERT(initialCommittedSize <= mappedSize);
 
   auto failed = mozilla::MakeScopeExit(
@@ -1609,13 +1610,23 @@ WasmArrayRawBuffer* WasmArrayRawBuffer::AllocateWasm(
   MOZ_RELEASE_ASSERT(mappedSize <= SIZE_MAX - gc::SystemPageSize());
   MOZ_RELEASE_ASSERT(numBytes <= SIZE_MAX - gc::SystemPageSize());
   MOZ_RELEASE_ASSERT(initialPages <= clampedMaxPages);
-  MOZ_ASSERT(numBytes % gc::SystemPageSize() == 0);
+  // With custom page sizes, the wasm-visible byte length may not fall along
+  // system page boundaries.
+  MOZ_ASSERT_IF(pageSize == wasm::PageSize::Standard,
+                numBytes % gc::SystemPageSize() == 0);
   MOZ_ASSERT(mappedSize % gc::SystemPageSize() == 0);
 
   uint64_t mappedSizeWithHeader = mappedSize + gc::SystemPageSize();
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   uint64_t numBytesWithHeader = numBytes + gc::SystemPageSize();
+#else
+  uint64_t numBytesWithHeader = wasm::RoundUpToNextSystemPageMultiple(numBytes) + gc::SystemPageSize();
+#endif
 
-  void* data = MapBufferMemory(addressType, (size_t)mappedSizeWithHeader,
+  MOZ_ASSERT(numBytesWithHeader % gc::SystemPageSize() == 0);
+
+  void* data = MapBufferMemory(addressType, pageSize,
+                               (size_t)mappedSizeWithHeader,
                                (size_t)numBytesWithHeader);
   if (!data) {
     return nullptr;
@@ -1637,7 +1648,9 @@ void WasmArrayRawBuffer::Release(void* mem) {
 
   MOZ_RELEASE_ASSERT(header->mappedSize() <= SIZE_MAX - gc::SystemPageSize());
   size_t mappedSizeWithHeader = header->mappedSize() + gc::SystemPageSize();
-  size_t committedSize = header->byteLength() + gc::SystemPageSize();
+  // FIXME: put in a helper method/function
+  size_t committedSize = wasm::RoundUpToNextSystemPageMultiple(header->byteLength()) + gc::SystemPageSize();
+  MOZ_ASSERT(wasm::RoundUpToNextSystemPageMultiple(header->byteLength()) % gc::SystemPageSize() == 0);
 
   static_assert(std::is_trivially_destructible_v<WasmArrayRawBuffer>,
                 "no need to call the destructor");
@@ -1654,7 +1667,8 @@ WasmArrayRawBuffer* ArrayBufferObject::BufferContents::wasmBuffer() const {
 template <typename ObjT, typename RawbufT>
 static ArrayBufferObjectMaybeShared* CreateSpecificWasmBuffer(
     JSContext* cx, const wasm::MemoryDesc& memory) {
-  bool useHugeMemory = wasm::IsHugeMemoryEnabled(memory.addressType());
+  bool useHugeMemory = wasm::IsHugeMemoryEnabled(
+      memory.addressType(), memory.pageSize());
   wasm::PageSize pageSize = memory.pageSize();
   Pages initialPages = memory.initialPages();
   Maybe<Pages> sourceMaxPages = memory.maximumPages();
@@ -1777,7 +1791,6 @@ ArrayBufferObjectMaybeShared* js::CreateWasmBuffer(
                      wasm::MaxMemoryPages(memory.addressType(),
                                           memory.pageSize()));
   MOZ_RELEASE_ASSERT(cx->wasm().haveSignalHandlers);
-  MOZ_ASSERT(memory.pageSize() == wasm::PageSize::Standard);
 
   if (memory.isShared()) {
     if (!cx->realm()->creationOptions().getSharedMemoryAndAtomicsEnabled()) {
@@ -2159,9 +2172,15 @@ ArrayBufferObject* ArrayBufferObject::wasmMovingGrowToPages(
 
   Pages clampedMaxPages =
       wasm::ClampedMaxPages(t, newPages, Nothing(), /* hugeMemory */ false);
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  wasm::PageSize pageSize = wasm::PageSize::Standard;
+#else
+  wasm::PageSize pageSize = newPages.pageSize();
+  MOZ_ASSERT(pageSize == oldBuf->wasmPageSize());
+#endif
   WasmArrayRawBuffer* newRawBuf =
       WasmArrayRawBuffer::AllocateWasm(oldBuf->wasmAddressType(),
-                                       oldBuf->wasmPageSize(),
+                                       pageSize,
                                        newPages, clampedMaxPages, Nothing(),
                                        Nothing());
   if (!newRawBuf) {

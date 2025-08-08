@@ -2174,7 +2174,9 @@ bool WasmMemoryObject::construct(JSContext* cx, unsigned argc, Value* vp) {
 
   Rooted<WasmMemoryObject*> memoryObj(
       cx, WasmMemoryObject::create(
-              cx, buffer, IsHugeMemoryEnabled(limits.addressType), proto));
+              cx, buffer,
+              IsHugeMemoryEnabled(limits.addressType, limits.pageSize),
+              proto));
   if (!memoryObj) {
     return false;
   }
@@ -2573,11 +2575,29 @@ size_t WasmMemoryObject::boundsCheckLimit() const {
   // max field.
   MOZ_ASSERT(mappedSize < UINT32_MAX);
 #endif
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   MOZ_ASSERT(mappedSize % wasm::StandardPageSize == 0);
   MOZ_ASSERT(mappedSize >= wasm::GuardSize);
   MOZ_ASSERT(wasm::IsValidBoundsCheckImmediate(mappedSize - wasm::GuardSize));
   size_t limit = mappedSize - wasm::GuardSize;
   MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType(), wasm::PageSize::Standard));
+#else
+  MOZ_ASSERT(mappedSize % wasm::PageSizeInBytes(buffer().wasmPageSize()) == 0);
+  MOZ_ASSERT(mappedSize % gc::SystemPageSize() == 0);
+  size_t limit;
+  if (buffer().wasmPageSize() == wasm::PageSize::Standard) {
+    MOZ_ASSERT(mappedSize >= wasm::GuardSize);
+    MOZ_ASSERT(wasm::IsValidBoundsCheckImmediate(mappedSize - wasm::GuardSize));
+    limit = mappedSize - wasm::GuardSize;
+    MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType(), wasm::PageSize::Standard));
+  } else {
+    MOZ_ASSERT(buffer().wasmPageSize() == wasm::PageSize::Tiny);
+    // For tiny page sizes, we need to use the actual byte length as the bounds
+    // check as we cannot rely on virtual memory for accesses between the byte
+    // length and the mapped size.
+    limit = buffer().byteLength();
+  }
+#endif
   return limit;
 }
 

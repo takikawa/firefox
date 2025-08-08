@@ -102,6 +102,13 @@ void BaseCompiler::bceCheckLocal(MemoryAccessDesc* access, AccessCheck* check,
     return;
   }
 
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  if (codeMeta_.memories[access->memoryIndex()].pageSize() !=
+      PageSize::Standard) {
+    return;
+  }
+#endif
+
   uint64_t offsetGuardLimit =
       GetMaxOffsetGuardLimit(codeMeta_.hugeMemoryEnabled(0));
 
@@ -371,8 +378,10 @@ template <typename RegAddressType>
 void BaseCompiler::prepareMemoryAccess(MemoryAccessDesc* access,
                                        AccessCheck* check, RegPtr instance,
                                        RegAddressType ptr) {
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   MOZ_ASSERT(codeMeta_.memories[access->memoryIndex()].pageSize() ==
              PageSize::Standard);
+#endif
 
   uint64_t offsetGuardLimit = GetMaxOffsetGuardLimit(
       codeMeta_.hugeMemoryEnabled(access->memoryIndex()));
@@ -417,17 +426,25 @@ void BaseCompiler::prepareMemoryAccess(MemoryAccessDesc* access,
 
   // Bounds check if required.
 
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  PageSize pageSize = PageSize::Standard;
+#else
+  PageSize pageSize = codeMeta_.memories[access->memoryIndex()].pageSize();
+  MOZ_ASSERT_IF(pageSize != PageSize::Standard, !check->omitBoundsCheck);
+#endif
+
+
   if (!codeMeta_.hugeMemoryEnabled(access->memoryIndex()) &&
       !check->omitBoundsCheck) {
     Label ok;
 #ifdef JS_64BIT
     // The checking depends on how many bits are in the pointer and how many
     // bits are in the bound.
-    static_assert(0x100000000 % StandardPageSize == 0);
+    static_assert(0x100000000 % StandardPageSize == 0); // FIXME: custom page size
     if (!codeMeta_.memories[access->memoryIndex()].boundsCheckLimitIs32Bits() &&
         MaxMemoryPages(codeMeta_.memories[access->memoryIndex()].addressType(),
-                       PageSize::Standard) >=
-        Pages::fromByteLengthExact(0x100000000, PageSize::Standard)) {
+                       pageSize) >=
+        Pages::fromByteLengthExact(0x100000000, pageSize)) {
       boundsCheck4GBOrLargerAccess(access->memoryIndex(), instance, ptr, &ok);
     } else {
       boundsCheckBelow4GBAccess(access->memoryIndex(), instance, ptr, &ok);

@@ -314,7 +314,7 @@ static_assert(MaxInlineMemoryFillLength < MinOffsetGuardLimit, "precondition");
 
 #ifdef JS_64BIT
 wasm::Pages wasm::MaxMemoryPages(AddressType t, PageSize pageSize) {
-  MOZ_ASSERT_IF(t == AddressType::I64, !IsHugeMemoryEnabled(t));
+  MOZ_ASSERT_IF(t == AddressType::I64, !IsHugeMemoryEnabled(t, pageSize));
   size_t desired = MaxMemoryPagesValidation(t, pageSize);
   size_t actual =
       ArrayBufferObject::ByteLengthLimit / PageSizeInBytes(pageSize);
@@ -381,6 +381,7 @@ uint64_t wasm::RoundUpToNextValidARMImmediate(uint64_t i) {
 
 Pages wasm::ClampedMaxPages(AddressType t, Pages initialPages,
                             const mozilla::Maybe<Pages>& sourceMaxPages,
+                            // FIXME: why is this unused
                             bool useHugeMemory) {
   PageSize pageSize = initialPages.pageSize();
   Pages clampedMaxPages = Pages::forPageSize(pageSize);
@@ -426,6 +427,14 @@ size_t wasm::ComputeMappedSize(wasm::Pages clampedMaxPages) {
   // implementation limits.
   size_t maxSize = clampedMaxPages.byteLength();
 
+  // For tiny page sizes, round up to a multiple of the system page size
+  // because the wasm page size is smaller than the mapping increment.
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  // FIXME: edge cases near the maximum
+  if (clampedMaxPages.pageSize() == PageSize::Tiny)
+    maxSize = RoundUpToNextSystemPageMultiple(maxSize);
+#endif
+
   // It is the bounds-check limit, not the mapped size, that gets baked into
   // code. Thus round up the maxSize to the next valid immediate value
   // *before* adding in the guard page.
@@ -434,9 +443,21 @@ size_t wasm::ComputeMappedSize(wasm::Pages clampedMaxPages) {
   uint64_t boundsCheckLimit = RoundUpToNextValidBoundsCheckImmediate(maxSize);
   MOZ_ASSERT(IsValidBoundsCheckImmediate(boundsCheckLimit));
 
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   MOZ_ASSERT(boundsCheckLimit % gc::SystemPageSize() == 0);
   MOZ_ASSERT(GuardSize % gc::SystemPageSize() == 0);
   return boundsCheckLimit + GuardSize;
+#else
+  if (clampedMaxPages.pageSize() == PageSize::Standard) {
+    MOZ_ASSERT(boundsCheckLimit % gc::SystemPageSize() == 0);
+    MOZ_ASSERT(GuardSize % gc::SystemPageSize() == 0);
+    return boundsCheckLimit + GuardSize;
+  } else {
+    // FIXME: does the immediate rounding above make sense in this case?
+    MOZ_ASSERT(clampedMaxPages.pageSize() == PageSize::Tiny);
+    return boundsCheckLimit;
+  }
+#endif
 }
 
 bool wasm::IsValidBoundsCheckImmediate(uint32_t i) {
@@ -446,6 +467,15 @@ bool wasm::IsValidBoundsCheckImmediate(uint32_t i) {
   return true;
 #endif
 }
+
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+uint64_t wasm::RoundUpToNextSystemPageMultiple(uint64_t i) {
+  if (i % gc::SystemPageSize() != 0)
+    // FIXME: check overflow, etc.
+    return ((i / gc::SystemPageSize()) + 1) * gc::SystemPageSize();
+  return i;
+}
+#endif
 
 uint64_t wasm::RoundUpToNextValidBoundsCheckImmediate(uint64_t i) {
 #ifdef JS_CODEGEN_ARM
