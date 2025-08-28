@@ -135,6 +135,7 @@ class ArrayBufferObjectMaybeShared;
 
 wasm::AddressType WasmArrayBufferAddressType(
     const ArrayBufferObjectMaybeShared* buf);
+wasm::PageSize WasmArrayBufferPageSize(const ArrayBufferObjectMaybeShared* buf);
 wasm::Pages WasmArrayBufferPages(const ArrayBufferObjectMaybeShared* buf);
 wasm::Pages WasmArrayBufferClampedMaxPages(
     const ArrayBufferObjectMaybeShared* buf);
@@ -158,6 +159,9 @@ class ArrayBufferObjectMaybeShared : public NativeObject {
 
   wasm::AddressType wasmAddressType() const {
     return WasmArrayBufferAddressType(this);
+  }
+  wasm::PageSize wasmPageSize() const {
+    return WasmArrayBufferPageSize(this);
   }
   wasm::Pages wasmPages() const { return WasmArrayBufferPages(this); }
   wasm::Pages wasmClampedMaxPages() const {
@@ -638,6 +642,7 @@ class ArrayBufferObject : public ArrayBufferObjectMaybeShared {
   size_t wasmMappedSize() const;
 
   wasm::AddressType wasmAddressType() const;
+  wasm::PageSize wasmPageSize() const;
   wasm::Pages wasmPages() const;
   wasm::Pages wasmClampedMaxPages() const;
   mozilla::Maybe<wasm::Pages> wasmSourceMaxPages() const;
@@ -1062,7 +1067,7 @@ class WasmArrayRawBuffer {
   size_t byteLength() const { return length_; }
 
   wasm::Pages pages() const {
-    return wasm::Pages::fromByteLengthExact(length_, wasm::PageSize::Standard);
+    return wasm::Pages::fromByteLengthExact(length_, pageSize());
   }
 
   /*

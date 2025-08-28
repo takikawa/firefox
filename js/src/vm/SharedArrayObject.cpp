@@ -129,7 +129,7 @@ WasmSharedArrayRawBuffer* WasmSharedArrayRawBuffer::AllocateWasm(
   uint8_t* buffer = reinterpret_cast<uint8_t*>(p) + gc::SystemPageSize();
   uint8_t* base = buffer - sizeof(WasmSharedArrayRawBuffer);
   return new (base) WasmSharedArrayRawBuffer(
-      buffer, length, addressType, clampedMaxPages,
+      buffer, length, addressType, pageSize, clampedMaxPages,
       sourceMaxPages.valueOr(Pages::fromPageCount(0, pageSize)),
       computedMappedSize);
 }
@@ -414,7 +414,7 @@ bool SharedArrayBufferObject::growImpl(JSContext* cx, const CallArgs& args) {
     }
 
     Pages newPages = Pages::fromByteLengthExact(newByteLength,
-                                                wasm::PageSize::Standard);
+                                                buffer->wasmPageSize());
     return buffer->rawWasmBufferObject()->wasmGrowToPagesInPlace(
         *lock, buffer->wasmAddressType(), newPages);
   }
