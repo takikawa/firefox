@@ -997,7 +997,7 @@ static JSObject* MemoryTypeToObject(JSContext* cx, bool shared,
   if (maxPages) {
     RootedId maximumId(cx, NameToId(cx->names().maximum));
     RootedValue maximumValue(cx);
-    if (!CreateAddressValue(cx, maxPages.value().value(), addressType,
+    if (!CreateAddressValue(cx, maxPages.value().pageCount(), addressType,
                             &maximumValue)) {
       ReportOutOfMemory(cx);
       return nullptr;
@@ -1010,7 +1010,8 @@ static JSObject* MemoryTypeToObject(JSContext* cx, bool shared,
 
   RootedId minimumId(cx, NameToId(cx->names().minimum));
   RootedValue minimumValue(cx);
-  if (!CreateAddressValue(cx, minPages.value(), addressType, &minimumValue)) {
+  if (!CreateAddressValue(cx, minPages.pageCount(), addressType,
+                          &minimumValue)) {
     ReportOutOfMemory(cx);
     return nullptr;
   }
@@ -2145,7 +2146,8 @@ bool WasmMemoryObject::construct(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  if (Pages(limits.initial) > MaxMemoryPages(limits.addressType)) {
+  if (Pages::fromPageCount(limits.initial, PageSize::Standard) >
+      MaxMemoryPages(limits.addressType, PageSize::Standard)) {
     JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
                              JSMSG_WASM_MEM_IMP_LIMIT);
     return false;
@@ -2570,7 +2572,7 @@ size_t WasmMemoryObject::boundsCheckLimit() const {
   MOZ_ASSERT(mappedSize >= wasm::GuardSize);
   MOZ_ASSERT(wasm::IsValidBoundsCheckImmediate(mappedSize - wasm::GuardSize));
   size_t limit = mappedSize - wasm::GuardSize;
-  MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType()));
+  MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType(), wasm::PageSize::Standard));
   return limit;
 }
 
@@ -2601,7 +2603,7 @@ uint64_t WasmMemoryObject::growShared(Handle<WasmMemoryObject*> memory,
 
   Pages oldNumPages = rawBuf->volatileWasmPages();
   Pages newPages = oldNumPages;
-  if (!newPages.checkedIncrement(Pages(delta))) {
+  if (!newPages.checkedIncrement(delta)) {
     return uint64_t(int64_t(-1));
   }
 
@@ -2611,7 +2613,7 @@ uint64_t WasmMemoryObject::growShared(Handle<WasmMemoryObject*> memory,
   // New buffer objects will be created lazily in all agents (including in
   // this agent) by bufferGetterImpl, above, so no more work to do here.
 
-  return oldNumPages.value();
+  return oldNumPages.pageCount();
 }
 
 /* static */
@@ -2627,13 +2629,14 @@ uint64_t WasmMemoryObject::grow(Handle<WasmMemoryObject*> memory,
 #if !defined(JS_64BIT)
   // TODO (large ArrayBuffer): See more information at the definition of
   // MaxMemoryBytes().
-  MOZ_ASSERT(MaxMemoryBytes(memory->addressType()) <= UINT32_MAX,
-             "Avoid 32-bit overflows");
+  MOZ_ASSERT(
+      MaxMemoryBytes(memory->addressType(), PageSize::Standard) <= UINT32_MAX,
+      "Avoid 32-bit overflows");
 #endif
 
   Pages oldNumPages = oldBuf->wasmPages();
   Pages newPages = oldNumPages;
-  if (!newPages.checkedIncrement(Pages(delta))) {
+  if (!newPages.checkedIncrement(delta)) {
     return uint64_t(int64_t(-1));
   }
 
@@ -2661,7 +2664,7 @@ uint64_t WasmMemoryObject::grow(Handle<WasmMemoryObject*> memory,
     }
   }
 
-  return oldNumPages.value();
+  return oldNumPages.pageCount();
 }
 
 /* static */

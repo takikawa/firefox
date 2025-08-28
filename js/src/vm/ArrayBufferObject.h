@@ -991,17 +991,19 @@ class MutableWrappedPtrOperations<InnerViewTable, Wrapper>
 
 class WasmArrayRawBuffer {
   wasm::AddressType addressType_;
+  wasm::PageSize pageSize_;
   wasm::Pages clampedMaxPages_;
   mozilla::Maybe<wasm::Pages> sourceMaxPages_;
   size_t mappedSize_;  // See comment on mappedSize().
   size_t length_;
 
  protected:
-  WasmArrayRawBuffer(wasm::AddressType addressType, uint8_t* buffer,
-                     wasm::Pages clampedMaxPages,
+  WasmArrayRawBuffer(wasm::AddressType addressType, wasm::PageSize pageSize,
+                     uint8_t* buffer, wasm::Pages clampedMaxPages,
                      const mozilla::Maybe<wasm::Pages>& sourceMaxPages,
                      size_t mappedSize, size_t length)
       : addressType_(addressType),
+        pageSize_(pageSize),
         clampedMaxPages_(clampedMaxPages),
         sourceMaxPages_(sourceMaxPages),
         mappedSize_(mappedSize),
@@ -1013,8 +1015,8 @@ class WasmArrayRawBuffer {
 
  public:
   static WasmArrayRawBuffer* AllocateWasm(
-      wasm::AddressType addressType, wasm::Pages initialPages,
-      wasm::Pages clampedMaxPages,
+      wasm::AddressType addressType, wasm::PageSize pageSize,
+      wasm::Pages initialPages, wasm::Pages clampedMaxPages,
       const mozilla::Maybe<wasm::Pages>& sourceMaxPages,
       const mozilla::Maybe<size_t>& mappedSize);
   static void Release(void* mem);
@@ -1035,6 +1037,7 @@ class WasmArrayRawBuffer {
   }
 
   wasm::AddressType addressType() const { return addressType_; }
+  wasm::PageSize pageSize() const { return pageSize_; }
 
   uint8_t* basePointer() { return dataPointer() - gc::SystemPageSize(); }
 
@@ -1059,7 +1062,7 @@ class WasmArrayRawBuffer {
   size_t byteLength() const { return length_; }
 
   wasm::Pages pages() const {
-    return wasm::Pages::fromByteLengthExact(length_);
+    return wasm::Pages::fromByteLengthExact(length_, wasm::PageSize::Standard);
   }
 
   /*

@@ -81,75 +81,115 @@ struct Pages {
  private:
   // Pages are specified by limit fields, which in general may be up to 2^48,
   // so we must use uint64_t here.
-  uint64_t value_;
+  uint64_t pageCount_;
+  PageSize pageSize_;
+
+  constexpr Pages(uint64_t pageCount, PageSize pageSize)
+      : pageCount_(pageCount), pageSize_(pageSize) {}
 
  public:
-  constexpr Pages() : value_(0) {}
-  constexpr explicit Pages(uint64_t value) : value_(value) {}
 
-  // Get the wrapped page value. Only use this if you must, prefer to use or
-  // add new APIs to Page.
-  uint64_t value() const { return value_; }
+  static constexpr Pages fromPageCount(uint64_t pageCount, PageSize pageSize) {
+    return Pages(pageCount, pageSize);
+  }
+
+  static constexpr Pages forPageSize(PageSize pageSize) {
+    return Pages(0, pageSize);
+  }
+
+  static constexpr int byteLengthIsMultipleOfPageSize(size_t byteLength,
+                                                      PageSize pageSize) {
+    return byteLength % PageSizeInBytes(pageSize) == 0;
+  }
 
   // Converts from a byte length to pages, assuming that the length is an
   // exact multiple of the page size.
-  static Pages fromByteLengthExact(size_t byteLength) {
-    MOZ_ASSERT(byteLength % StandardPageSize == 0);
-    return Pages(byteLength / StandardPageSize);
+  static constexpr Pages fromByteLengthExact(size_t byteLength,
+                                             PageSize pageSize) {
+    MOZ_RELEASE_ASSERT(byteLengthIsMultipleOfPageSize(byteLength, pageSize));
+    return Pages(byteLength / PageSizeInBytes(pageSize), pageSize);
   }
+
+  Pages& operator=(const Pages& other) {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    pageCount_ = other.pageCount_;
+    return *this;
+  }
+
+  // Get the wrapped page count and size. Only use this if you must, prefer to
+  // use or add new APIs to Page.
+  uint64_t pageCount() const { return pageCount_; }
+  PageSize pageSize() const { return pageSize_; }
 
   // Return whether the page length may overflow when converted to a byte
   // length in the native word size.
   bool hasByteLength() const {
-    mozilla::CheckedInt<size_t> length(value_);
-    length *= StandardPageSize;
+    mozilla::CheckedInt<size_t> length(pageCount_);
+    length *= PageSizeInBytes(pageSize_);
     return length.isValid();
   }
 
   // Converts from pages to byte length in the native word size. Users must
   // check for overflow, or be assured else-how that overflow cannot happen.
   size_t byteLength() const {
-    mozilla::CheckedInt<size_t> length(value_);
-    length *= StandardPageSize;
+    mozilla::CheckedInt<size_t> length(pageCount_);
+    length *= PageSizeInBytes(pageSize_);
     return length.value();
   }
 
   // Increment this pages by delta and return whether the resulting value
   // did not overflow. If there is no overflow, then this is set to the
   // resulting value.
-  bool checkedIncrement(Pages delta) {
-    mozilla::CheckedInt<uint64_t> newValue = value_;
-    newValue += delta.value_;
+  bool checkedIncrement(uint64_t delta) {
+    mozilla::CheckedInt<uint64_t> newValue = pageCount_;
+    newValue += delta;
     if (!newValue.isValid()) {
       return false;
     }
-    value_ = newValue.value();
+    pageCount_ = newValue.value();
     return true;
   }
 
   // Implement pass-through comparison operators so that Pages can be compared.
-
-  bool operator==(Pages other) const { return value_ == other.value_; }
-  bool operator!=(Pages other) const { return value_ != other.value_; }
-  bool operator<=(Pages other) const { return value_ <= other.value_; }
-  bool operator<(Pages other) const { return value_ < other.value_; }
-  bool operator>=(Pages other) const { return value_ >= other.value_; }
-  bool operator>(Pages other) const { return value_ > other.value_; }
+  bool operator==(Pages other) const {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    return pageCount_ == other.pageCount_;
+  }
+  bool operator!=(Pages other) const {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    return pageCount_ != other.pageCount_;
+  }
+  bool operator<=(Pages other) const {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    return pageCount_ <= other.pageCount_;
+  }
+  bool operator<(Pages other) const {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    return pageCount_ < other.pageCount_;
+  }
+  bool operator>=(Pages other) const {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    return pageCount_ >= other.pageCount_;
+  }
+  bool operator>(Pages other) const {
+    MOZ_RELEASE_ASSERT(other.pageSize_ == pageSize_);
+    return pageCount_ > other.pageCount_;
+  }
 };
 
 // The largest number of pages the application can request.
-extern Pages MaxMemoryPages(AddressType t);
+extern Pages MaxMemoryPages(AddressType t, PageSize pageSize);
 
 // The byte value of MaxMemoryPages(t).
-static inline size_t MaxMemoryBytes(AddressType t) {
-  return MaxMemoryPages(t).byteLength();
+static inline size_t MaxMemoryBytes(AddressType t, PageSize pageSize) {
+  return MaxMemoryPages(t, pageSize).byteLength();
 }
 
-// A value at least as large as MaxMemoryBytes(t) representing the largest valid
+// A value at least as large as MaxMemoryBytes() representing the largest valid
 // bounds check limit on the system.  (It can be larger than MaxMemoryBytes()
 // because bounds check limits are rounded up to fit formal requirements on some
 // platforms.  Also see ComputeMappedSize().)
-extern size_t MaxMemoryBoundsCheckLimit(AddressType t);
+extern size_t MaxMemoryBoundsCheckLimit(AddressType t, PageSize pageSize);
 
 static inline uint64_t MaxMemoryPagesValidation(AddressType addressType) {
   return addressType == AddressType::I32 ? MaxMemory32PagesValidation
