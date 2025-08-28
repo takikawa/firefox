@@ -2061,7 +2061,8 @@ class MOZ_STACK_CLASS ModuleValidator : public ModuleValidatorShared {
       return false;
     }
 
-    Limits limits = Limits(mask + 1, Nothing(), Shareable::False);
+    Limits limits = Limits(mask + 1, Nothing(), Shareable::False,
+                           PageSize::Standard);
     codeMeta_->asmJSSigToTableIndex[sigIndex] = codeMeta_->tables.length();
     if (!codeMeta_->tables.emplaceBack(limits, RefType::func(),
                                        /* initExpr */ Nothing(),
@@ -2126,6 +2127,7 @@ class MOZ_STACK_CLASS ModuleValidator : public ModuleValidatorShared {
       limits.initial = memory_.minPages();
       limits.maximum = Nothing();
       limits.addressType = AddressType::I32;
+      limits.pageSize = PageSize::Standard;
       if (!codeMeta_->memories.append(MemoryDesc(limits))) {
         return nullptr;
       }

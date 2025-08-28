@@ -193,7 +193,8 @@ bool CompileBuiltinModule(JSContext* cx,
       return false;
     }
     if (!codeMeta->memories.append(
-            MemoryDesc(Limits(0, Nothing(), memory->shared)))) {
+            MemoryDesc(Limits(0, Nothing(), memory->shared,
+                              PageSize::Standard)))) {
       ReportOutOfMemory(cx);
       return false;
     }
