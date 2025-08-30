@@ -225,12 +225,20 @@ enum class LimitsFlags {
   HasMaximum = 0x1,
   IsShared = 0x2,
   IsI64 = 0x4,
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  HasCustomPageSize = 0x8,
+#endif
 };
 
 enum class LimitsMask {
   Table = uint8_t(LimitsFlags::HasMaximum) | uint8_t(LimitsFlags::IsI64),
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  Memory = uint8_t(LimitsFlags::HasMaximum) | uint8_t(LimitsFlags::IsShared) |
+           uint8_t(LimitsFlags::IsI64) | uint8_t(LimitsFlags::HasCustomPageSize),
+#else
   Memory = uint8_t(LimitsFlags::HasMaximum) | uint8_t(LimitsFlags::IsShared) |
            uint8_t(LimitsFlags::IsI64),
+#endif
 };
 
 enum class DataSegmentKind {
@@ -1130,10 +1138,14 @@ enum class FieldFlags { Mutable = 0x01, AllowedMask = 0x01 };
 
 enum class FieldWideningOp { None, Signed, Unsigned };
 
-// The WebAssembly spec hard-codes the virtual page size to be 64KiB and
-// requires the size of linear memory to always be a multiple of 64KiB.
-
-enum class PageSize { Standard = 16 };
+// The WebAssembly custom page sizes proposal allows for a virtual page size of
+// either the 64KiB, or 1 byte.  We call these Standard and Tiny, respectively.
+enum class PageSize {
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  Tiny = 0,
+#endif
+  Standard = 16
+};
 
 // These limits are agreed upon with other engines for consistency.
 

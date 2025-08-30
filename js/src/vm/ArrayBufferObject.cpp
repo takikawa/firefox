@@ -1777,6 +1777,7 @@ ArrayBufferObjectMaybeShared* js::CreateWasmBuffer(
                      wasm::MaxMemoryPages(memory.addressType(),
                                           memory.pageSize()));
   MOZ_RELEASE_ASSERT(cx->wasm().haveSignalHandlers);
+  MOZ_ASSERT(memory.pageSize() == wasm::PageSize::Standard);
 
   if (memory.isShared()) {
     if (!cx->realm()->creationOptions().getSharedMemoryAndAtomicsEnabled()) {
