@@ -315,7 +315,7 @@ static_assert(MaxInlineMemoryFillLength < MinOffsetGuardLimit, "precondition");
 #ifdef JS_64BIT
 wasm::Pages wasm::MaxMemoryPages(AddressType t, PageSize pageSize) {
   MOZ_ASSERT_IF(t == AddressType::I64, !IsHugeMemoryEnabled(t));
-  size_t desired = MaxMemoryPagesValidation(t);
+  size_t desired = MaxMemoryPagesValidation(t, pageSize);
   size_t actual =
       ArrayBufferObject::ByteLengthLimit / PageSizeInBytes(pageSize);
   return wasm::Pages::fromPageCount(std::min(desired, actual), pageSize);

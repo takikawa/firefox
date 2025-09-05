@@ -191,9 +191,17 @@ static inline size_t MaxMemoryBytes(AddressType t, PageSize pageSize) {
 // platforms.  Also see ComputeMappedSize().)
 extern size_t MaxMemoryBoundsCheckLimit(AddressType t, PageSize pageSize);
 
-static inline uint64_t MaxMemoryPagesValidation(AddressType addressType) {
-  return addressType == AddressType::I32 ? MaxMemory32PagesValidation
-                                         : MaxMemory64PagesValidation;
+static inline uint64_t MaxMemoryPagesValidation(AddressType addressType, PageSize pageSize) {
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  if (pageSize == PageSize::Tiny) {
+    return addressType == AddressType::I32 ? MaxMemory32TinyPagesValidation
+                                           : MaxMemory64TinyPagesValidation;
+  }
+#endif
+
+  MOZ_ASSERT(pageSize == PageSize::Standard);
+  return addressType == AddressType::I32 ? MaxMemory32StandardPagesValidation
+                                         : MaxMemory64StandardPagesValidation;
 }
 
 static inline uint64_t MaxTableElemsValidation(AddressType addressType) {

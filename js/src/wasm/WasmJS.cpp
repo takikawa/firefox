@@ -2145,7 +2145,8 @@ bool WasmMemoryObject::construct(JSContext* cx, unsigned argc, Value* vp) {
   RootedObject obj(cx, &args[0].toObject());
   Limits limits;
   if (!GetLimits(cx, obj, LimitsKind::Memory, &limits) ||
-      !CheckLimits(cx, MaxMemoryPagesValidation(limits.addressType),
+      !CheckLimits(cx,
+                   MaxMemoryPagesValidation(limits.addressType, limits.pageSize),
                    LimitsKind::Memory, &limits)) {
     return false;
   }

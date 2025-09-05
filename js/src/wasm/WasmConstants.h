@@ -1170,8 +1170,12 @@ static const unsigned MaxLocals = 50000;
 static const unsigned MaxParams = 1000;
 static const unsigned MaxResults = 1000;
 static const unsigned MaxStructFields = 10000;
-static const uint64_t MaxMemory32PagesValidation = uint64_t(1) << 16;
-static const uint64_t MaxMemory64PagesValidation = (uint64_t(1) << 37) - 1;
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+static const uint64_t MaxMemory32TinyPagesValidation = UINT32_MAX;
+static const uint64_t MaxMemory64TinyPagesValidation = UINT64_MAX;
+#endif
+static const uint64_t MaxMemory32StandardPagesValidation = uint64_t(1) << 16;
+static const uint64_t MaxMemory64StandardPagesValidation = (uint64_t(1) << 37) - 1;
 static const unsigned MaxStringBytes = 100000;
 static const unsigned MaxModuleBytes = 1024 * 1024 * 1024;
 static const unsigned MaxFunctionBytes = 7654321;

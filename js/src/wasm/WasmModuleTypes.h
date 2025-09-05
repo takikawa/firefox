@@ -872,7 +872,7 @@ using MemoryDescVector = Vector<MemoryDesc, 1, SystemAllocPolicy>;
 
 // We never need to worry about overflow with a Memory32 field when
 // using a uint64_t.
-static_assert(MaxMemory32PagesValidation <= UINT64_MAX / StandardPageSize);
+static_assert(MaxMemory32StandardPagesValidation <= UINT64_MAX / StandardPageSize);
 
 struct TableDesc {
   Limits limits;

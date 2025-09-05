@@ -2985,7 +2985,7 @@ static bool DecodeMemoryTypeAndLimits(Decoder& d, CodeMetadata* codeMeta,
     return false;
   }
 
-  uint64_t maxField = MaxMemoryPagesValidation(limits.addressType);
+  uint64_t maxField = MaxMemoryPagesValidation(limits.addressType, limits.pageSize);
 
   if (limits.initial > maxField) {
     return d.fail("initial memory size too big");
