@@ -71,10 +71,12 @@ function checkPageCount(pageSize, pageCount) {
     }
     if (pageCount <= maxPageCount(pageSize))
         instantiate();
-    else if (pageCount > 0xffffffff)
-        // Unrepresentable in the text format as it's out of bounds
-        assertErrorMessage(instantiate, SyntaxError,
-                           /invalid u32 number/);
+    else if (pageCount > 0xffffffff) {
+        // In this case, a u64 is encoded instead of a u32 and a decoding
+        // error raises this exception.
+        assertErrorMessage(instantiate, WebAssembly.CompileError,
+                           /expected maximum length/);
+    }
     else
         assertErrorMessage(instantiate, WebAssembly.CompileError,
                            /maximum memory size too big/);
