@@ -158,8 +158,14 @@ RegI32 BaseCompiler::popConstMemoryAccess<RegI32>(MemoryAccessDesc* access,
                 UINT64_MAX - HugeOffsetGuardLimit);
 #endif
   uint64_t ea = uint64_t(addr) + uint64_t(access->offset32());
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   uint64_t limit = codeMeta_.memories[access->memoryIndex()].initialLength() +
                    offsetGuardLimit;
+#else
+  PageSize pageSize = codeMeta_.memories[access->memoryIndex()].pageSize();
+  uint64_t limit = codeMeta_.memories[access->memoryIndex()].initialLength() +
+                   (pageSize == PageSize::Standard ? offsetGuardLimit : 0);
+#endif
 
   check->omitBoundsCheck = ea < limit;
   check->omitAlignmentCheck = (ea & (access->byteSize() - 1)) == 0;
@@ -192,7 +198,12 @@ RegI64 BaseCompiler::popConstMemoryAccess<RegI64>(MemoryAccessDesc* access,
   ea += access->offset64();
   mozilla::CheckedUint64 limit(
       codeMeta_.memories[access->memoryIndex()].initialLength());
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   limit += offsetGuardLimit;
+#else
+  PageSize pageSize = codeMeta_.memories[access->memoryIndex()].pageSize();
+  limit += (pageSize == PageSize::Standard ? offsetGuardLimit : 0);
+#endif
 
   if (ea.isValid() && limit.isValid()) {
     check->omitBoundsCheck = ea.value() < limit.value();
@@ -430,9 +441,9 @@ void BaseCompiler::prepareMemoryAccess(MemoryAccessDesc* access,
   PageSize pageSize = PageSize::Standard;
 #else
   PageSize pageSize = codeMeta_.memories[access->memoryIndex()].pageSize();
-  MOZ_ASSERT_IF(pageSize != PageSize::Standard, !check->omitBoundsCheck);
+  MOZ_ASSERT_IF(pageSize != PageSize::Standard,
+                !codeMeta_.hugeMemoryEnabled(access->memoryIndex()));
 #endif
-
 
   if (!codeMeta_.hugeMemoryEnabled(access->memoryIndex()) &&
       !check->omitBoundsCheck) {
@@ -440,7 +451,7 @@ void BaseCompiler::prepareMemoryAccess(MemoryAccessDesc* access,
 #ifdef JS_64BIT
     // The checking depends on how many bits are in the pointer and how many
     // bits are in the bound.
-    static_assert(0x100000000 % StandardPageSize == 0); // FIXME: custom page size
+    static_assert(0x100000000 % StandardPageSize == 0);
     if (!codeMeta_.memories[access->memoryIndex()].boundsCheckLimitIs32Bits() &&
         MaxMemoryPages(codeMeta_.memories[access->memoryIndex()].addressType(),
                        pageSize) >=

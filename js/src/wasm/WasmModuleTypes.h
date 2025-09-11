@@ -834,7 +834,7 @@ struct MemoryDesc {
   // larger than 32-bits.
   bool boundsCheckLimitIs32Bits() const {
     return limits.maximum.isSome() &&
-           limits.maximum.value() < (0x100000000 / StandardPageSize);
+           limits.maximum.value() < (0x100000000 / PageSizeInBytes(pageSize()));
   }
 
   AddressType addressType() const { return limits.addressType; }
