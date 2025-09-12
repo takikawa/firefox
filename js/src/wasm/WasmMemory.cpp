@@ -298,11 +298,17 @@ static_assert(MaxMemoryAccessSize < GuardSize,
 static_assert(OffsetGuardLimit < UINT32_MAX,
               "checking for overflow against OffsetGuardLimit is enough.");
 
-uint64_t wasm::GetMaxOffsetGuardLimit(bool hugeMemory) {
-#ifdef WASM_SUPPORTS_HUGE_MEMORY
-  return hugeMemory ? HugeOffsetGuardLimit : OffsetGuardLimit;
+uint64_t wasm::GetMaxOffsetGuardLimit(bool hugeMemory, PageSize sz) {
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  uint64_t guardLimit = OffsetGuardLimit;
 #else
-  return OffsetGuardLimit;
+  uint64_t guardLimit = sz == PageSize::Standard ? OffsetGuardLimit : 0;
+#endif
+
+#ifdef WASM_SUPPORTS_HUGE_MEMORY
+  return hugeMemory ? HugeOffsetGuardLimit : guardLimit;
+#else
+  return guardLimit;
 #endif
 }
 

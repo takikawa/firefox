@@ -221,7 +221,7 @@ extern Pages ClampedMaxPages(AddressType t, Pages initialPages,
 // vm/ArrayBufferObject.cpp.
 extern size_t ComputeMappedSize(Pages clampedMaxPages);
 
-extern uint64_t GetMaxOffsetGuardLimit(bool hugeMemory);
+extern uint64_t GetMaxOffsetGuardLimit(bool hugeMemory, PageSize sz);
 
 // Return whether the given immediate satisfies the constraints of the platform.
 extern bool IsValidBoundsCheckImmediate(uint32_t i);

@@ -2564,6 +2564,7 @@ bool WasmMemoryObject::movingGrowable() const {
 }
 
 size_t WasmMemoryObject::boundsCheckLimit() const {
+  // FIXME: move tiny page case from below into this conditional
   if (!buffer().isWasm() || isHuge()) {
     return buffer().byteLength();
   }
@@ -2589,14 +2590,15 @@ size_t WasmMemoryObject::boundsCheckLimit() const {
     MOZ_ASSERT(mappedSize >= wasm::GuardSize);
     MOZ_ASSERT(wasm::IsValidBoundsCheckImmediate(mappedSize - wasm::GuardSize));
     limit = mappedSize - wasm::GuardSize;
-    MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType(), wasm::PageSize::Standard));
   } else {
     MOZ_ASSERT(buffer().wasmPageSize() == wasm::PageSize::Tiny);
     // For tiny page sizes, we need to use the actual byte length as the bounds
     // check as we cannot rely on virtual memory for accesses between the byte
     // length and the mapped size.
+    MOZ_ASSERT(wasm::IsValidBoundsCheckImmediate(buffer().byteLength()));
     limit = buffer().byteLength();
   }
+  MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType(), buffer().wasmPageSize()));
 #endif
   return limit;
 }
