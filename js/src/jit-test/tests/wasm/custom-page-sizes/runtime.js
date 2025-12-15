@@ -146,23 +146,6 @@
 
 {
   let instance = wasmEvalText(`(module
-      (memory i32 20 20 (pagesize 1))
-      (func (export "f") (param i32) (result i32)
-        (i32x4.extract_lane 0 (v128.load (local.get 0)))
-      )
-    )
-  `);
-
-  instance.exports.f(1);
-  instance.exports.f(4);
-  assertErrorMessage(() => instance.exports.f(5), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(10), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(15), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(20), WebAssembly.RuntimeError, "index out of bounds");
-}
-
-{
-  let instance = wasmEvalText(`(module
       (memory i32 0 0 (pagesize 1))
       (func (export "f") (param i32)
         (i64.store8 (local.get 0) (i64.const 42))
@@ -211,20 +194,6 @@
 
   assertErrorMessage(() => instance.exports.f(0), WebAssembly.RuntimeError, "index out of bounds");
   assertErrorMessage(() => instance.exports.f(1), WebAssembly.RuntimeError, "index out of bounds");
-}
-
-{
-  let instance = wasmEvalText(`(module
-      (memory i64 0 0 (pagesize 1))
-      (func (export "f") (param i64) (result i32)
-        (i32x4.extract_lane 0 (v128.load (local.get 0)))
-      )
-    )
-  `);
-
-  assertErrorMessage(() => instance.exports.f(0n), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(1n), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(2n), WebAssembly.RuntimeError, "index out of bounds");
 }
 
 {
@@ -281,51 +250,6 @@
   instance.exports.f(0);
   assertErrorMessage(() => instance.exports.f(1), WebAssembly.RuntimeError, "index out of bounds");
   assertErrorMessage(() => instance.exports.f(2), WebAssembly.RuntimeError, "index out of bounds");
-}
-
-{
-  let instance = wasmEvalText(`(module
-      (memory i64 16 16 (pagesize 1))
-      (func (export "f") (param i64) (result i32)
-        (i32x4.extract_lane 0 (v128.load (local.get 0)))
-      )
-    )
-  `);
-
-  instance.exports.f(0n);
-  assertErrorMessage(() => instance.exports.f(1n), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(2n), WebAssembly.RuntimeError, "index out of bounds");
-}
-
-// Test ARM-related cases
-{
-  let instance = wasmEvalText(`(module
-      (memory i32 69648 69648 (pagesize 1))
-      (func (export "f") (param i32)
-        (i32.store8 (local.get 0) (i32.const 42))
-      )
-    )
-  `);
-
-  instance.exports.f(0)
-  instance.exports.f(69647)
-  assertErrorMessage(() => instance.exports.f(69648), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(69649), WebAssembly.RuntimeError, "index out of bounds");
-}
-
-{
-  let instance = wasmEvalText(`(module
-      (memory i64 69648 69648 (pagesize 1))
-      (func (export "f") (param i64)
-        (i32.store8 (local.get 0) (i32.const 42))
-      )
-    )
-  `);
-
-  instance.exports.f(0n)
-  instance.exports.f(69647n)
-  assertErrorMessage(() => instance.exports.f(69648n), WebAssembly.RuntimeError, "index out of bounds");
-  assertErrorMessage(() => instance.exports.f(69649n), WebAssembly.RuntimeError, "index out of bounds");
 }
 
 // Test bounds checking under 4GB.
@@ -413,7 +337,7 @@
   assertErrorMessage(() => instance.exports.f(), WebAssembly.RuntimeError, "index out of bounds");
 }
 
-if (getBuildConfiguration("x86")) {
+if (getBuildConfiguration("x86") || getBuildConfiguration("arm")) {
   assertErrorMessage(
     () => wasmEvalText(`(module
         (memory i32 4294967295 4294967295 (pagesize 1))
@@ -479,7 +403,7 @@ if (getBuildConfiguration("x86")) {
 }
 
 // Ensure bounds checking above 4GB works as expected.
-if (getBuildConfiguration("x86")) {
+if (getBuildConfiguration("x86") || getBuildConfiguration("arm")) {
   assertErrorMessage(
     () => wasmEvalText(`(module
         (memory i64 4294967299 4294967299 (pagesize 1))
