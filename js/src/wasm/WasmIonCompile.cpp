@@ -1471,17 +1471,48 @@ class FunctionCompiler {
   // If the bounds checking strategy requires it, load the bounds check limit
   // from the instance.
   MWasmLoadInstance* maybeLoadBoundsCheckLimit(uint32_t memoryIndex,
+                                               unsigned byteSize,
                                                MIRType type) {
     MOZ_ASSERT(type == MIRType::Int32 || type == MIRType::Int64);
     if (codeMeta().hugeMemoryEnabled(memoryIndex)) {
       return nullptr;
     }
+
+    bool hasCustomPageSize = false;
+    uintptr_t boundsCheckOffset = offsetof(MemoryInstanceData, boundsCheckLimit);
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+    hasCustomPageSize =
+        codeMeta().memories[memoryIndex].pageSize() != PageSize::Standard;
+    if (hasCustomPageSize) {
+      switch (byteSize) {
+        case 1:
+          boundsCheckOffset = offsetof(MemoryInstanceData, boundsCheckLimit);
+          break;
+        case 2:
+          boundsCheckOffset = offsetof(MemoryInstanceData, boundsCheckLimit16);
+          break;
+        case 4:
+          boundsCheckOffset = offsetof(MemoryInstanceData, boundsCheckLimit32);
+          break;
+        case 8:
+          boundsCheckOffset = offsetof(MemoryInstanceData, boundsCheckLimit64);
+          break;
+        case 16:
+          boundsCheckOffset = offsetof(MemoryInstanceData, boundsCheckLimit128);
+          break;
+        default:
+          MOZ_CRASH("invalid byte size for memory access");
+          break;
+      }
+    }
+#endif
+
     uint32_t offset =
-        memoryIndex == 0
+        (memoryIndex == 0 && !hasCustomPageSize)
             ? Instance::offsetOfMemory0BoundsCheckLimit()
             : (Instance::offsetInData(
                   codeMeta().offsetOfMemoryInstanceData(memoryIndex) +
-                  offsetof(MemoryInstanceData, boundsCheckLimit)));
+                  boundsCheckOffset));
     AliasSet aliases = !codeMeta().memories[memoryIndex].canMovingGrow()
                            ? AliasSet::None()
                            : AliasSet::Load(AliasSet::WasmHeapMeta);
@@ -1580,9 +1611,11 @@ class FunctionCompiler {
     }
   }
 
-  MWasmLoadInstance* needBoundsCheck(uint32_t memoryIndex) {
+  MWasmLoadInstance* needBoundsCheck(uint32_t memoryIndex, unsigned byteSize) {
+#ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
     MOZ_RELEASE_ASSERT(codeMeta().memories[memoryIndex].pageSize() ==
                        PageSize::Standard);
+#endif
 #ifdef JS_64BIT
     // For 32-bit base pointers:
     //
@@ -1605,6 +1638,7 @@ class FunctionCompiler {
     bool mem32LimitIs64Bits = false;
 #endif
     return maybeLoadBoundsCheckLimit(memoryIndex,
+                                     byteSize,
                                      mem32LimitIs64Bits || isMem64(memoryIndex)
                                          ? MIRType::Int64
                                          : MIRType::Int32);
@@ -1684,7 +1718,7 @@ class FunctionCompiler {
     // Emit the bounds check if necessary; it traps if it fails.  This may
     // update *base.
     MWasmLoadInstance* boundsCheckLimit =
-        needBoundsCheck(access->memoryIndex());
+        needBoundsCheck(access->memoryIndex(), access->byteSize());
     if (boundsCheckLimit) {
       performBoundsCheck(access->memoryIndex(), base, boundsCheckLimit);
     }
@@ -1753,7 +1787,7 @@ class FunctionCompiler {
     if (codeMeta().isAsmJS()) {
       MOZ_ASSERT(access->offset64() == 0);
       MWasmLoadInstance* boundsCheckLimit =
-          maybeLoadBoundsCheckLimit(access->memoryIndex(), MIRType::Int32);
+          maybeLoadBoundsCheckLimit(access->memoryIndex(), access->byteSize(), MIRType::Int32);
       load = MAsmJSLoadHeap::New(alloc(), memoryBase, base, boundsCheckLimit,
                                  access->type());
     } else {
@@ -1781,7 +1815,7 @@ class FunctionCompiler {
     if (codeMeta().isAsmJS()) {
       MOZ_ASSERT(access->offset64() == 0);
       MWasmLoadInstance* boundsCheckLimit =
-          maybeLoadBoundsCheckLimit(access->memoryIndex(), MIRType::Int32);
+          maybeLoadBoundsCheckLimit(access->memoryIndex(), access->byteSize(), MIRType::Int32);
       v = maybeCanonicalizeNaN(access->type(), v);
       store = MAsmJSStoreHeap::New(alloc(), memoryBase, base, boundsCheckLimit,
                                    access->type(), v);

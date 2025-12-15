@@ -128,7 +128,7 @@
     /* capitalized name   */ CustomPageSizes,                           \
     /* lower case name    */ customPageSizes,                           \
     /* compile predicate  */ WASM_CUSTOM_PAGE_SIZES_ENABLED,            \
-    /* compiler predicate */ BaselineAvailable(cx),                     \
+    /* compiler predicate */ AnyCompilerAvailable(cx),                  \
     /* flag predicate     */ !IsFuzzingIon(cx),                         \
     /* flag force enable  */ false,                                     \
     /* flag fuzz enable   */ true,                                      \
