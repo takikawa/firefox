@@ -452,6 +452,9 @@ class alignas(16) Instance {
   // Called by Wasm(Memory|Table)Object when a moving resize occurs:
 
   void onMovingGrowMemory(const WasmMemoryObject* memory);
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  void onSharedGrowMemory(const SharedArrayRawBuffer* buffer);
+#endif
   void onMovingGrowTable(const Table* table);
 
   bool initSegments(JSContext* cx, const DataSegmentVector& dataSegments,

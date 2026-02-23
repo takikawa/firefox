@@ -2313,6 +2313,17 @@ void WasmInstanceObject::finalize(JS::GCContext* gcx, JSObject* obj) {
   gcx->delete_(obj, &instance.indirectGlobals(),
                MemoryUse::WasmInstanceGlobals);
   if (!instance.isNewborn()) {
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+    for (size_t i = 0; i < instance.instance().codeMeta().memories.length(); i++) {
+      MemoryInstanceData& md = instance.instance().memoryInstanceData(i);
+      // FIXME: This currently doesn't work and will crash. The memory object
+      // might be finalized first, in which case the remove operation doesn't
+      // work.
+      //if (md.isShared) {
+      //  instance.instance().sharedMemoryBuffer(i)->removeGrowObserver(&instance.instance());
+      //}
+    }
+#endif
     if (instance.instance().debugEnabled()) {
       instance.instance().debug().finalize(gcx);
     }
@@ -3110,7 +3121,7 @@ size_t WasmMemoryObject::boundsCheckLimit() const {
   // check as we cannot rely on virtual memory for accesses between the byte
   // length and the mapped size.
   if (buffer().wasmPageSize() == wasm::PageSize::Tiny) {
-    size_t limit = buffer().byteLength();
+    size_t limit = volatileMemoryLength();
     MOZ_ASSERT(limit <= MaxMemoryBoundsCheckLimit(addressType(),
                                                   buffer().wasmPageSize()));
     return limit;
@@ -3144,6 +3155,16 @@ bool WasmMemoryObject::addMovingGrowObserver(JSContext* cx,
                                              WasmInstanceObject* instance) {
   MOZ_ASSERT(movingGrowable() || pageSize() != PageSize::Standard);
 
+  // For shared memories we add an observer via a different mechanism
+  // that ensures safe concurrency, and only when custom page sizes
+  // are used.
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  if (isShared()) {
+    return addSharedGrowObserver(cx, instance);
+  }
+#endif
+
+  MOZ_ASSERT(!isShared());
   InstanceSet* observers = getOrCreateObservers(cx);
   if (!observers) {
     return false;
@@ -3158,6 +3179,20 @@ bool WasmMemoryObject::addMovingGrowObserver(JSContext* cx,
 
   return true;
 }
+
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+bool WasmMemoryObject::addSharedGrowObserver(JSContext* cx,
+                                             WasmInstanceObject* instance) {
+  MOZ_ASSERT(isShared());
+  MOZ_ASSERT(pageSize() != PageSize::Standard);
+
+  // Ensure buffer can't grow or add other observers during this operation.
+  WasmSharedArrayRawBuffer* rawBuf = sharedArrayRawBuffer();
+  WasmSharedArrayRawBuffer::Lock lock(rawBuf);
+
+  return rawBuf->addGrowObserver(&instance->instance());
+}
+#endif
 
 /* static */
 uint64_t WasmMemoryObject::growShared(Handle<WasmMemoryObject*> memory,
@@ -3174,6 +3209,12 @@ uint64_t WasmMemoryObject::growShared(Handle<WasmMemoryObject*> memory,
   if (!rawBuf->wasmGrowToPagesInPlace(lock, memory->addressType(), newPages)) {
     return uint64_t(int64_t(-1));
   }
+
+  // Notify observers so that bounds checks can be updated as needed.
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  rawBuf->notifyGrowObservers();
+#endif
+
   // New buffer objects will be created lazily in all agents (including in
   // this agent) by bufferGetterImpl, above, so no more work to do here.
 

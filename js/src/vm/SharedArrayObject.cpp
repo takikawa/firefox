@@ -113,6 +113,9 @@ WasmSharedArrayRawBuffer* WasmSharedArrayRawBuffer::AllocateWasm(
     return nullptr;
   }
 
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  MOZ_ASSERT_IF(pageSize == wasm::PageSize::Tiny, !mappedSize.isSome());
+#endif
   size_t computedMappedSize = mappedSize.isSome()
                                   ? *mappedSize
                                   : wasm::ComputeMappedSize(clampedMaxPages);
@@ -158,12 +161,25 @@ bool WasmSharedArrayRawBuffer::wasmGrowToPagesInPlace(const Lock&,
   }
 
   size_t delta = newLength - length_;
-  MOZ_ASSERT(delta % wasm::StandardPageSizeBytes == 0);
+  size_t oldCommittedSize = length_;
 
-  uint8_t* dataEnd = dataPointerShared().unwrap(/* for resize */) + length_;
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  // For tiny pages, we have to make sure to start and end the new committed
+  // memory at a system page boundary.
+  if (newPages.pageSize() != wasm::PageSize::Standard) {
+    oldCommittedSize = wasm::RoundToClosestSystemPageSize(length_);
+    delta = oldCommittedSize >= newLength ? 0 : newLength - oldCommittedSize;
+    delta = wasm::RoundToClosestSystemPageSize(delta);
+    MOZ_ASSERT(delta % gc::SystemPageSize() == 0);
+  }
+#endif
+  MOZ_ASSERT(delta % PageSizeInBytes(newPages.pageSize()) == 0);
+
+  uint8_t* dataEnd =
+      dataPointerShared().unwrap(/* for resize */) + oldCommittedSize;
   MOZ_ASSERT(uintptr_t(dataEnd) % gc::SystemPageSize() == 0);
 
-  if (!CommitBufferMemory(dataEnd, delta)) {
+  if (delta && !CommitBufferMemory(dataEnd, delta)) {
     return false;
   }
 
@@ -272,7 +288,9 @@ void SharedArrayRawBuffer::dropReference() {
     wasm::AddressType addressType = wasmBuf->wasmAddressType();
     uint8_t* basePointer = wasmBuf->basePointer();
     size_t mappedSizeWithHeader = wasmBuf->mappedSize() + gc::SystemPageSize();
-    size_t committedSize = wasmBuf->volatileByteLength() + gc::SystemPageSize();
+    size_t committedSize =
+        WasmSharedArrayAccessibleSize(wasmBuf->volatileByteLength()) +
+        gc::SystemPageSize();
     // Call the destructor to destroy the growLock_ Mutex.
     wasmBuf->~WasmSharedArrayRawBuffer();
     UnmapBufferMemory(addressType, basePointer, mappedSizeWithHeader,
@@ -304,6 +322,22 @@ bool SharedArrayRawBuffer::growJS(size_t newByteLength) {
     }
   }
 }
+
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+void SharedArrayRawBuffer::notifyGrowObservers() {
+  for (auto iter = observers_.iter(); !iter.done(); iter.next()) {
+    iter.get()->onSharedGrowMemory(this);
+  }
+}
+
+bool SharedArrayRawBuffer::addGrowObserver(wasm::Instance* instance) {
+  return observers_.put(instance);
+}
+
+void SharedArrayRawBuffer::removeGrowObserver(wasm::Instance* instance) {
+  observers_.remove(instance);
+}
+#endif
 
 static bool IsSharedArrayBuffer(HandleValue v) {
   return v.isObject() && v.toObject().is<SharedArrayBufferObject>();

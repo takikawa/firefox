@@ -4251,6 +4251,39 @@ void Instance::onMovingGrowMemory(const WasmMemoryObject* memory) {
   }
 }
 
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+void Instance::onSharedGrowMemory(const SharedArrayRawBuffer* buffer) {
+  for (uint32_t i = 0; i < codeMeta().memories.length(); i++) {
+    MemoryInstanceData& md = memoryInstanceData(i);
+    if (!md.isShared) {
+      continue;
+    }
+    if (buffer != static_cast<SharedArrayRawBuffer*>(md.memory->sharedArrayRawBuffer())) {
+      continue;
+    }
+    SharedArrayBufferObject& buffer = md.memory->buffer().as<SharedArrayBufferObject>();
+
+    md.base = buffer.dataPointerShared().unwrap();
+    md.mappedSize = buffer.wasmMappedSize();
+    size_t limit = md.memory->boundsCheckLimit();
+#if !defined(JS_64BIT)
+    // We assume that the limit is a 32-bit quantity
+    MOZ_ASSERT(limit <= UINT32_MAX);
+#endif
+    md.boundsCheckLimit = limit;
+    md.boundsCheckLimit16 = limit > 1 ? limit - 1 : 0;
+    md.boundsCheckLimit32 = limit > 3 ? limit - 3 : 0;
+    md.boundsCheckLimit64 = limit > 7 ? limit - 7 : 0;
+    md.boundsCheckLimit128 = limit > 15 ? limit - 15 : 0;
+
+    if (i == 0) {
+      memory0Base_ = md.base;
+      memory0BoundsCheckLimit_ = md.boundsCheckLimit;
+    }
+  }
+}
+#endif
+
 void Instance::onMovingGrowTable(const Table* table) {
   MOZ_ASSERT(!isAsmJS());
 

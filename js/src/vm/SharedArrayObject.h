@@ -62,6 +62,10 @@ class SharedArrayRawBuffer {
   mozilla::Atomic<uint32_t, mozilla::ReleaseAcquire> refcount_;
   mozilla::Atomic<size_t, mozilla::SequentiallyConsistent> length_;
 
+  // A set of Wasm instances that observe this buffer. The instances
+  // are notified when the size of this buffer changes.
+  HashSet<wasm::Instance*, DefaultHasher<wasm::Instance*>, SystemAllocPolicy> observers_;
+
   // The header node of a circular doubly-linked list of structures
   // representing tasks waiting on some location within this buffer.
   FutexWaiterListHead waiters_;
@@ -71,7 +75,8 @@ class SharedArrayRawBuffer {
       : isWasm_(false),
         isGrowableJS_(isGrowableJS),
         refcount_(1),
-        length_(length) {
+        length_(length),
+        observers_() {
     MOZ_ASSERT(buffer == dataPointerShared());
   }
 
@@ -114,6 +119,12 @@ class SharedArrayRawBuffer {
   // allocated with enough space to hold at least |newByteLength| bytes. IOW
   // this method merely sets the number of user accessible bytes of this buffer.
   bool growJS(size_t newByteLength);
+
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  void notifyGrowObservers();
+  bool addGrowObserver(wasm::Instance*);
+  void removeGrowObserver(wasm::Instance*);
+#endif
 
   static size_t offsetOfByteLength() {
     return offsetof(SharedArrayRawBuffer, length_);

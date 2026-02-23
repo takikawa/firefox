@@ -359,6 +359,9 @@ class WasmMemoryObject : public NativeObject {
   WasmSharedArrayRawBuffer* sharedArrayRawBuffer() const;
 
   bool addMovingGrowObserver(JSContext* cx, WasmInstanceObject* instance);
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  bool addSharedGrowObserver(JSContext* cx, WasmInstanceObject* instance);
+#endif
   static uint64_t grow(Handle<WasmMemoryObject*> memory, uint64_t delta,
                        JSContext* cx);
   static void discard(Handle<WasmMemoryObject*> memory, uint64_t byteOffset,
