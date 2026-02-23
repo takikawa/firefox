@@ -402,16 +402,7 @@ size_t wasm::ComputeMappedSize(wasm::Pages clampedMaxPages) {
   // system page size after clamping.
 #ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
   if (clampedMaxPages.pageSize() == wasm::PageSize::Tiny) {
-    mozilla::CheckedInt<size_t> length(maxSize);
-
-    if (length.value() % gc::SystemPageSize() != 0) {
-      length += ComputeByteAlignment(length.value(), gc::SystemPageSize());
-      // This should be valid because of previous clamping.
-      MOZ_RELEASE_ASSERT(length.isValid());
-      MOZ_ASSERT(length.value() % gc::SystemPageSize() == 0);
-      maxSize = length.value();
-    }
-
+    maxSize = RoundToClosestSystemPageSize(maxSize);
     MOZ_ASSERT(maxSize <= clampedMaxPages.byteLength() + GuardSize);
   }
 #endif
@@ -432,3 +423,19 @@ size_t wasm::ComputeMappedSize(wasm::Pages clampedMaxPages) {
 
   return maxSize;
 }
+
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+size_t wasm::RoundToClosestSystemPageSize(size_t maxSize) {
+  mozilla::CheckedInt<size_t> length(maxSize);
+
+  if (length.value() % gc::SystemPageSize() != 0) {
+    length += ComputeByteAlignment(length.value(), gc::SystemPageSize());
+    // This should be valid because of previous clamping.
+    MOZ_RELEASE_ASSERT(length.isValid());
+    MOZ_ASSERT(length.value() % gc::SystemPageSize() == 0);
+    maxSize = length.value();
+  }
+
+  return maxSize;
+}
+#endif

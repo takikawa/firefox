@@ -215,6 +215,12 @@ extern Pages ClampedMaxPages(AddressType t, Pages initialPages,
 // vm/ArrayBufferObject.cpp.
 extern size_t ComputeMappedSize(Pages clampedMaxPages);
 
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+// Round up to the next system page size. Used for memory allocations when using
+// custom page size.
+extern size_t RoundToClosestSystemPageSize(size_t maxSize);
+#endif
+
 extern uint64_t GetMaxOffsetGuardLimit(bool hugeMemory, PageSize sz);
 
 // Return the next higher valid immediate that satisfies the constraints of the

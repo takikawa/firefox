@@ -2802,7 +2802,11 @@ bool Instance::init(JSContext* cx, const JSObjectVector& funcImports,
     data.mappedSize = memory->buffer().wasmMappedSize();
 
     // Add observer if our memory base may grow
-    if (memory && memory->movingGrowable() &&
+    // If a custom page size is used, non-moving memories need to be
+    // updated as well to reflect bounds check changes.
+    if (memory &&
+        (memory->movingGrowable() ||
+         memory->pageSize() != PageSize::Standard) &&
         !memory->addMovingGrowObserver(cx, object_)) {
       return false;
     }

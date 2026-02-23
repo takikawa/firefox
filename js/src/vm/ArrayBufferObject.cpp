@@ -1551,9 +1551,21 @@ void ResizableArrayBufferObject::resize(size_t newByteLength) {
   MOZ_ASSERT(newSize <= mappedSize());
 
   size_t delta = newSize - oldSize;
-  MOZ_ASSERT(delta % wasm::StandardPageSizeBytes == 0);
+  size_t oldCommittedSize = oldSize;
 
-  uint8_t* dataEnd = dataPointer() + oldSize;
+#ifdef ENABLE_WASM_CUSTOM_PAGE_SIZES
+  // For tiny pages, we have to make sure to start and end the new committed
+  // memory at a system page boundary.
+  if (newPages.pageSize() == wasm::PageSize::Tiny) {
+    oldCommittedSize = wasm::RoundToClosestSystemPageSize(oldSize);
+    delta = oldCommittedSize >= newSize ? 0 : newSize - oldCommittedSize;
+    delta = wasm::RoundToClosestSystemPageSize(delta);
+    MOZ_ASSERT(delta % gc::SystemPageSize() == 0);
+  }
+#endif
+  MOZ_ASSERT(delta % PageSizeInBytes(newPages.pageSize()) == 0);
+
+  uint8_t* dataEnd = dataPointer() + oldCommittedSize;
   MOZ_ASSERT(uintptr_t(dataEnd) % gc::SystemPageSize() == 0);
 
   if (delta && !CommitBufferMemory(dataEnd, delta)) {
@@ -1650,11 +1662,13 @@ WasmArrayRawBuffer* WasmArrayRawBuffer::AllocateWasm(
 #ifndef ENABLE_WASM_CUSTOM_PAGE_SIZES
   uint64_t numBytesWithHeader = numBytes + gc::SystemPageSize();
 #else
-  // For tiny page size, the mapped size and the committed size are the
-  // same since we do not have a slop area or guard page.
-  uint64_t numBytesWithHeader = pageSize == wasm::PageSize::Tiny
-                                    ? mappedSizeWithHeader
-                                    : (numBytes + gc::SystemPageSize());
+  // For tiny page size, the committed size must be a multiple of the
+  // system page size as we commit memory in page increments.
+  uint64_t numBytesWithHeader =
+      (pageSize == wasm::PageSize::Tiny
+           ? wasm::RoundToClosestSystemPageSize(numBytes)
+           : numBytes) +
+      gc::SystemPageSize();
 #endif
 
   MOZ_ASSERT(numBytesWithHeader % gc::SystemPageSize() == 0);
@@ -1686,9 +1700,11 @@ void WasmArrayRawBuffer::Release(void* mem) {
   size_t committedSize = header->byteLength() + gc::SystemPageSize();
 #else
   // See above for numBytesWithHeader in AllocateWasm.
-  size_t committedSize = header->pageSize() == wasm::PageSize::Tiny
-                             ? mappedSizeWithHeader
-                             : (header->byteLength() + gc::SystemPageSize());
+  size_t committedSize =
+      (header->pageSize() == wasm::PageSize::Tiny
+           ? wasm::RoundToClosestSystemPageSize(header->byteLength())
+           : header->byteLength()) +
+      gc::SystemPageSize();
 #endif
   MOZ_ASSERT(committedSize % gc::SystemPageSize() == 0);
 

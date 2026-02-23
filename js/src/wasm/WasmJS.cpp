@@ -3142,7 +3142,7 @@ wasm::PageSize WasmMemoryObject::pageSize() const {
 
 bool WasmMemoryObject::addMovingGrowObserver(JSContext* cx,
                                              WasmInstanceObject* instance) {
-  MOZ_ASSERT(movingGrowable());
+  MOZ_ASSERT(movingGrowable() || pageSize() != PageSize::Standard);
 
   InstanceSet* observers = getOrCreateObservers(cx);
   if (!observers) {
